@@ -1,0 +1,12 @@
+node_modules/
+dist
+build
+.next
+.DS_Store
+.env
+__pycache__
+*.pyc
+coverage
+NOTES
+.aptos/
+

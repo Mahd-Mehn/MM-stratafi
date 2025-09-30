@@ -1,0 +1,18 @@
+{
+	"name": "stratafi-monorepo",
+	"private": true,
+	"version": "0.0.1",
+	"packageManager": "pnpm@8.15.0",
+	"scripts": {
+		"build:packages": "npm run build --workspace=@stratafi/ui && npm run build --workspace=@stratafi/sdk",
+		"dev:frontend": "npm run build:packages && npm run dev --workspace=frontend",
+		"dev:helios": "echo 'Run Helios manually (python)'",
+		"build": "npm run build:packages && npm run build --workspace=frontend",
+		"lint": "echo 'Add lint aggregation if needed'",
+		"test": "echo 'Add test runner aggregation'"
+	},
+	"devDependencies": {
+		"turbo": "^2.0.0"
+	},
+	"workspaces": ["apps/*", "packages/*"]
+}

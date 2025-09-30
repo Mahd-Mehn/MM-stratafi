@@ -1,0 +1,16 @@
+[package]
+name = "StrataFi"
+version = "0.0.1"
+authors = ["StrataFi Team"]
+
+[addresses]
+stratafi = "0x573cb8a8f68cf3409779951d315fcd68b6ec99a98aa68ba9a2d1b7e38da9de63"
+aptos_framework = "0x1"
+aptos_std = "0x1"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "testnet" }
+
+[dev-addresses]
+user1 = "0x1111111111111111111111111111111111111111111111111111111111111111"
+user2 = "0x2222222222222222222222222222222222222222222222222222222222222222"
