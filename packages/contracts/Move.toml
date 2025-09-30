@@ -4,7 +4,7 @@ version = "0.0.1"
 authors = ["StrataFi Team"]
 
 [addresses]
-stratafi = "0x573cb8a8f68cf3409779951d315fcd68b6ec99a98aa68ba9a2d1b7e38da9de63"
+stratafi = "0x5a2db6fce3e213f1bc902e8827a98e306b1bb0987d8d8cd63f96f87edcc69b53"
 aptos_framework = "0x1"
 aptos_std = "0x1"
 

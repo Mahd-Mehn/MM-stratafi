@@ -1,5 +1,9 @@
-fastapi==0.110.0
-uvicorn==0.29.0
-aptos-sdk==0.7.0
-requests==2.31.0
-pydantic==2.6.4
+fastapi
+uvicorn
+aptos-sdk
+requests
+pydantic
+SQLAlchemy
+psycopg2-binary
+numpy
+python-dotenv

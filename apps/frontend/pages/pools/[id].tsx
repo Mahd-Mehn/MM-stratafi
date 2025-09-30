@@ -6,17 +6,21 @@ import Link from 'next/link'
 import { HealthScoreGauge, WaterfallVisualizer, TrancheSelector } from '../../components/UIComponents'
 import { getPoolById, Pool } from '../../lib/poolsData'
 import { api } from '../../lib/api'
+import { useAptosTx, isValidTxHash, waitForTransaction } from '../../lib/aptosTx'
 import { useNotifications } from '../../context/NotificationContext'
 
 export default function PoolDetail() {
   const router = useRouter()
   const { id } = router.query
+  const { callInvest } = useAptosTx()
   const [pool, setPool] = useState<Pool | null>(null)
   const [selectedTranche, setSelectedTranche] = useState('Senior')
   const [investAmount, setInvestAmount] = useState('')
   const [loading, setLoading] = useState(true)
   const [investing, setInvesting] = useState(false)
   const [aiHealthScore, setAiHealthScore] = useState<number | null>(null)
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState<boolean>(false)
 
   useEffect(() => {
     if (id) {
@@ -56,15 +60,22 @@ export default function PoolDetail() {
     )
 
     try {
-      // Simulate investment transaction
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      const vaultOwner = process.env.NEXT_PUBLIC_MODULE_ADDR as string
+      if (!vaultOwner) {
+        throw new Error('Module address not set (NEXT_PUBLIC_MODULE_ADDR)')
+      }
+      const vaultId = Number(id)
+      const trancheMap: Record<string, number> = { Senior: 0, Mezzanine: 1, Junior: 2 }
+      const tranche = trancheMap[selectedTranche] ?? 0
+      const amount = Math.floor(parseFloat(investAmount))
+      const tx = await callInvest(vaultOwner, vaultId, tranche, amount)
       
       dismiss(loadingId)
       success(
         'Investment Successful!',
-        `Successfully invested ${investAmount} USDC in ${selectedTranche} tranche`,
+        `Successfully invested ${investAmount} in ${selectedTranche} tranche`,
         {
-          txHash: `0x${Math.random().toString(16).substr(2, 64)}`,
+          txHash: isValidTxHash(tx?.hash) ? tx!.hash : undefined,
           duration: 8000,
           action: {
             label: 'View Portfolio',
@@ -72,15 +83,56 @@ export default function PoolDetail() {
           }
         }
       )
+
+      // Optional: wait for confirmation
+      if (isValidTxHash(tx?.hash)) {
+        const confirmId = notifyLoading('Confirming on-chain', 'Waiting for transaction confirmation...')
+        try {
+          const timeoutMs = parseInt(process.env.NEXT_PUBLIC_TX_CONFIRM_TIMEOUT_MS || '30000', 10)
+          const intervalMs = parseInt(process.env.NEXT_PUBLIC_TX_CONFIRM_INTERVAL_MS || '1000', 10)
+          await waitForTransaction(tx!.hash, { timeoutMs, intervalMs })
+          dismiss(confirmId)
+          success('Confirmed', 'Your transaction has been confirmed on-chain', {
+            txHash: tx!.hash,
+            duration: 6000,
+          })
+          setConfirmed(true)
+        } catch (e) {
+          dismiss(confirmId)
+          // Silent, keep initial success
+        }
+      }
       
+      if (isValidTxHash(tx?.hash)) {
+        setLastTxHash(tx!.hash)
+      } else {
+        setLastTxHash(null)
+      }
+
+      // Persist to backend after confirmation if possible
+      if (isValidTxHash(tx?.hash)) {
+        try {
+          await fetch('/api/transactions/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              poolId: Number(id),
+              vaultId,
+              tranche,
+              amount,
+              txHash: tx!.hash,
+            }),
+          })
+        } catch (_) {
+          // non-blocking
+        }
+      }
+
       setInvestAmount('')
     } catch (err) {
       dismiss(loadingId)
-      error(
-        'Transaction Failed',
-        'Could not complete your investment. Please try again.',
-        { duration: 6000 }
-      )
+      const message = err instanceof Error ? err.message : 'Could not complete your investment. Please try again.'
+      error('Transaction Failed', message, { duration: 6000 })
     } finally {
       setInvesting(false)
     }
@@ -288,7 +340,6 @@ export default function PoolDetail() {
               transition={{ delay: 0.3 }}
               className="glass-card"
             >
-              <h3 className="text-lg font-semibold text-white mb-4">Invest Now</h3>
               
               <div className="space-y-4">
                 <div>
@@ -344,6 +395,17 @@ export default function PoolDetail() {
                     'Invest Now'
                   )}
                 </button>
+
+                {isValidTxHash(lastTxHash || undefined) && (
+                  <a
+                    href={`https://explorer.aptoslabs.com/txn/${lastTxHash}?network=${(process.env.NEXT_PUBLIC_APTOS_NETWORK || 'testnet').toLowerCase()}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`w-full inline-flex justify-center py-3 rounded-lg font-semibold transition ${confirmed ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-700 hover:bg-gray-600'} text-white`}
+                  >
+                    {confirmed ? 'View on Explorer (Confirmed)' : 'View on Explorer'}
+                  </a>
+                )}
 
                 <div className="flex items-start gap-2 p-3 bg-blue-500/10 rounded-lg">
                   <Info className="w-4 h-4 text-blue-400 mt-0.5" />

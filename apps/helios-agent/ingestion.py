@@ -10,7 +10,10 @@ import asyncio
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import logging
-from aptos_sdk.client import RestClient
+from urllib.parse import urljoin
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +22,27 @@ class DataIngestionAgent:
         self.nodit_api_key = os.getenv("NODIT_API_KEY", "demo_key")
         self.aptos_node_url = os.getenv("APTOS_NODE_URL", "https://fullnode.testnet.aptoslabs.com/v1")
         self.nodit_base_url = "https://aptos-testnet.nodit.io/v1"
-        self.aptos_client = RestClient(self.aptos_node_url)
         
         # Initialize headers for Nodit API
         self.headers = {
             "X-API-KEY": self.nodit_api_key,
             "Content-Type": "application/json"
         }
+
+    def _fullnode_get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        """Basic GET against Aptos fullnode REST API"""
+        base = self.aptos_node_url.rstrip('/') + '/'
+        url = urljoin(base, path.lstrip('/'))
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _account_resources(self, address: str) -> List[Dict[str, Any]]:
+        try:
+            return self._fullnode_get(f"/accounts/{address}/resources")
+        except Exception as e:
+            logger.warning(f"account_resources failed: {e}")
+            return []
     
     async def check_nodit_connection(self) -> bool:
         """Check if Nodit API is accessible"""
@@ -72,7 +89,7 @@ class DataIngestionAgent:
         """Fetch on-chain vault data from Aptos"""
         try:
             # Get account resources
-            resources = self.aptos_client.account_resources(address)
+            resources = self._account_resources(address)
             
             vault_data = {}
             for resource in resources:
@@ -135,7 +152,7 @@ class DataIngestionAgent:
         """Get current asset composition of a vault"""
         try:
             # Try to get real data from chain
-            resources = self.aptos_client.account_resources(address)
+            resources = self._account_resources(address)
             
             for resource in resources:
                 if "Vault" in resource["type"]:
