@@ -1,0 +1,24 @@
+name: stratafi-helios-agent
+services:
+  - name: helios-agent
+    type: docker
+    docker:
+      dockerfile: apps/helios-agent/Dockerfile
+      build_context: .
+    ports:
+      - port: 8000
+        protocol: http
+    env:
+      - key: OPENAI_API_KEY
+        value: ${OPENAI_API_KEY}
+      - key: APTOS_NETWORK
+        value: testnet
+      - key: APTOS_NODE_URL
+        value: https://fullnode.testnet.aptoslabs.com/v1
+    health_check:
+      http:
+        path: /health
+        port: 8000
+    regions:
+      - fra
+    instance_type: nano
