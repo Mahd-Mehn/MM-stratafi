@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { motion } from 'framer-motion'
-import { Search, Filter, TrendingUp, Clock, Shield, DollarSign } from 'lucide-react'
+import { TrendingUp, Users, DollarSign, Shield, AlertTriangle, ArrowRight, Plus, Search, Clock } from 'lucide-react'
 import Link from 'next/link'
-import { poolsData, Pool } from '../../lib/poolsData'
+import { getPoolById, Pool, fetchPoolsFromDB } from '../../lib/poolsData'
 
 export default function Pools() {
   const router = useRouter()
@@ -19,11 +19,15 @@ export default function Pools() {
 
   const fetchPools = async () => {
     setLoading(true)
-    // Simulate API call delay for realistic loading
-    setTimeout(() => {
-      setPools(poolsData)
+    try {
+      // Fetch pools from database
+      const dbPools = await fetchPoolsFromDB()
+      setPools(dbPools)
+    } catch (error) {
+      console.error('Error fetching pools:', error)
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   const filteredPools = pools.filter(pool => {
@@ -48,8 +52,19 @@ export default function Pools() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-white mb-2">RWA Pools</h1>
-          <p className="text-gray-400">Explore and invest in tokenized real-world asset pools</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">RWA Pools</h1>
+              <p className="text-gray-400">Explore and invest in tokenized real-world asset pools</p>
+            </div>
+            <Link
+              href="/create-pool"
+              className="flex items-center gap-2 px-6 py-3 bg-primary-500/20 text-primary-400 rounded-lg hover:bg-primary-500/30 transition font-semibold"
+            >
+              <Plus className="w-5 h-5" />
+              Create Pool
+            </Link>
+          </div>
         </motion.div>
 
         {/* Search and Filter */}

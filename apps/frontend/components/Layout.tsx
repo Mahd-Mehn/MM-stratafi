@@ -1,10 +1,25 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { BarChart3, Layers, Github, Twitter } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { BarChart3, Layers, Github, Twitter, Plus, User, Settings, ChevronDown, LogOut, Shield } from 'lucide-react'
 import { WalletConnect } from './WalletConnect'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -28,15 +43,75 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <Layers className="w-4 h-4" />
                   <span>Pools</span>
                 </Link>
+                <Link href="/create-pool" className="flex items-center space-x-1 text-primary-400 hover:text-primary-300 transition">
+                  <Plus className="w-4 h-4" />
+                  <span>Create Pool</span>
+                </Link>
                 <Link href="/portfolio" className="flex items-center space-x-1 text-gray-300 hover:text-white transition">
                   <BarChart3 className="w-4 h-4" />
                   <span>Portfolio</span>
+                </Link>
+                <Link href="/admin" className="flex items-center space-x-1 text-gray-300 hover:text-white transition">
+                  <Shield className="w-4 h-4" />
+                  <span>Admin</span>
                 </Link>
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
               <WalletConnect />
+              
+              {/* Profile Dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="flex items-center space-x-2 text-gray-300 hover:text-white transition p-2 rounded-lg hover:bg-gray-800/50"
+                >
+                  <User className="w-5 h-5" />
+                  <ChevronDown className={`w-4 h-4 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {profileDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50"
+                    >
+                      <div className="py-2">
+                        <Link
+                          href="/profile"
+                          className="flex items-center space-x-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-700/50 transition"
+                          onClick={() => setProfileDropdownOpen(false)}
+                        >
+                          <User className="w-4 h-4" />
+                          <span>Profile</span>
+                        </Link>
+                        <Link
+                          href="/settings"
+                          className="flex items-center space-x-2 px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-700/50 transition"
+                          onClick={() => setProfileDropdownOpen(false)}
+                        >
+                          <Settings className="w-4 h-4" />
+                          <span>Settings</span>
+                        </Link>
+                        <div className="border-t border-gray-700 my-2"></div>
+                        <button
+                          className="flex items-center space-x-2 px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition w-full text-left"
+                          onClick={() => {
+                            setProfileDropdownOpen(false)
+                            // Add disconnect wallet logic here
+                          }}
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Disconnect</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </div>
@@ -45,8 +120,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <main className="flex-1">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
           {children}
@@ -60,15 +135,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div>
               <h3 className="text-lg font-semibold text-white mb-3">StrataFi Protocol</h3>
               <p className="text-gray-400 text-sm">
-                Institutional-grade structured credit on Aptos. Tokenize, tranche, and stream yields atomically.
+                Decentralized real-world asset tokenization platform built on Aptos blockchain.
               </p>
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white mb-3">Resources</h3>
               <div className="space-y-2">
-                <Link href="#" className="text-gray-400 hover:text-white text-sm block">Documentation</Link>
-                <Link href="#" className="text-gray-400 hover:text-white text-sm block">GitHub</Link>
-                <Link href="#" className="text-gray-400 hover:text-white text-sm block">Audit Reports</Link>
+                <Link href="/pools" className="text-gray-400 hover:text-white text-sm block">
+                  Pools
+                </Link>
+                <Link href="/create-pool" className="text-gray-400 hover:text-white text-sm block">
+                  Create Pool
+                </Link>
+                <Link href="/portfolio" className="text-gray-400 hover:text-white text-sm block">
+                  Portfolio
+                </Link>
+                <Link href="#" className="text-gray-400 hover:text-white text-sm block">
+                  Audit Reports
+                </Link>
               </div>
             </div>
             <div>

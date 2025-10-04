@@ -1,17 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Wallet, User } from 'lucide-react'
 
-declare global {
-  interface Window {
-    aptos?: any
-    petra?: any
-  }
-}
-
 interface WalletState {
   connected: boolean
   address?: string
-  publicKey?: string
   connecting: boolean
   error?: string
 }
@@ -27,12 +19,11 @@ export function WalletConnect() {
     
     // Listen for account changes
     if (window.aptos) {
-      window.aptos.onAccountChange((newAccount: any) => {
+      window.aptos.onAccountChange?.((newAccount: any) => {
         if (newAccount) {
           setWalletState({
             connected: true,
             address: newAccount.address,
-            publicKey: newAccount.publicKey,
             connecting: false
           })
         } else {
@@ -51,13 +42,20 @@ export function WalletConnect() {
         return
       }
       
-      const response = await window.aptos.isConnected()
-      if (response) {
+      // Handle both promise and direct boolean returns
+      let isConnected: boolean
+      try {
+        const result = window.aptos.isConnected()
+        isConnected = result instanceof Promise ? await result : result
+      } catch {
+        isConnected = false
+      }
+      
+      if (isConnected) {
         const account = await window.aptos.account()
         setWalletState({
           connected: true,
           address: account.address,
-          publicKey: account.publicKey,
           connecting: false
         })
       }
@@ -88,7 +86,6 @@ export function WalletConnect() {
         setWalletState({
           connected: true,
           address: account.address,
-          publicKey: account.publicKey,
           connecting: false
         })
       }
@@ -122,7 +119,7 @@ export function WalletConnect() {
   }
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center relative">
       {walletState.connected ? (
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2 px-3 py-1 bg-gray-800/50 rounded-lg">
@@ -139,21 +136,29 @@ export function WalletConnect() {
           </button>
         </div>
       ) : (
-        <button
-          onClick={connectWallet}
-          disabled={walletState.connecting}
-          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-lg hover:opacity-90 transition disabled:opacity-50"
-        >
-          <Wallet className="w-4 h-4" />
-          <span>
-            {walletState.connecting ? 'Connecting...' : 'Connect Wallet'}
-          </span>
-        </button>
-      )}
-      
-      {walletState.error && (
-        <div className="absolute top-16 right-0 mt-2 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
-          <p className="text-red-400 text-sm">{walletState.error}</p>
+        <div className="flex flex-col items-end">
+          <button
+            onClick={connectWallet}
+            disabled={walletState.connecting}
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-lg hover:opacity-90 transition disabled:opacity-50"
+          >
+            <Wallet className="w-4 h-4" />
+            <span>
+              {walletState.connecting ? 'Connecting...' : 'Connect Wallet'}
+            </span>
+          </button>
+          
+          {walletState.error && (
+            <div className="absolute top-12 right-0 mt-2 p-3 bg-red-500/20 border border-red-500/50 rounded-lg max-w-xs">
+              <p className="text-red-400 text-sm">{walletState.error}</p>
+              <button 
+                onClick={() => setWalletState(prev => ({ ...prev, error: undefined }))}
+                className="text-red-300 hover:text-red-200 text-xs mt-1"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

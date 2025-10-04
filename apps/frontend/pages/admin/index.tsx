@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Plus, Edit3, Trash2, Eye, TrendingUp, Users, DollarSign, Activity, Settings, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { poolsData } from '../../lib/poolsData'
+import { poolsData, fetchPoolsFromDB } from '../../lib/poolsData'
 import { useNotifications } from '../../context/NotificationContext'
 
 interface AdminStats {
@@ -28,8 +28,21 @@ export default function AdminDashboard() {
   useEffect(() => {
     // Check admin authentication (simplified for demo)
     checkAdminAuth()
-    calculateStats()
+    loadPools()
   }, [])
+
+  const loadPools = async () => {
+    try {
+      const dbPools = await fetchPoolsFromDB()
+      setPools(dbPools)
+      calculateStats(dbPools)
+    } catch (error) {
+      console.error('Error loading pools:', error)
+      // Fallback to static data
+      setPools(poolsData)
+      calculateStats(poolsData)
+    }
+  }
 
   const checkAdminAuth = () => {
     // In production, check wallet address against admin list
@@ -41,12 +54,14 @@ export default function AdminDashboard() {
     setIsAdmin(true)
   }
 
-  const calculateStats = () => {
-    const totalValue = pools.reduce((sum, pool) => sum + pool.totalValue, 0)
-    const avgHealth = pools.reduce((sum, pool) => sum + pool.healthScore, 0) / pools.length
+  const calculateStats = (poolList = pools) => {
+    if (poolList.length === 0) return
+    
+    const totalValue = poolList.reduce((sum, pool) => sum + pool.totalValue, 0)
+    const avgHealth = poolList.reduce((sum, pool) => sum + pool.healthScore, 0) / poolList.length
     
     setStats({
-      totalPools: pools.length,
+      totalPools: poolList.length,
       totalValue,
       totalInvestors: 243, // Mock data
       avgHealthScore: avgHealth
@@ -176,20 +191,20 @@ export default function AdminDashboard() {
           <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
           <div className="grid md:grid-cols-4 gap-4">
             <Link
-              href="/admin/create-pool"
+              href="/admin/pools/create"
               className="p-4 bg-primary-500/10 border border-primary-500/20 rounded-lg hover:bg-primary-500/20 transition text-center"
             >
               <Plus className="w-8 h-8 text-primary-400 mx-auto mb-2" />
               <p className="text-white font-semibold">Create Pool</p>
             </Link>
             
-            <button
-              onClick={() => router.push('/admin/health-monitor')}
+            <Link
+              href="/admin/vault-manager"
               className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition text-center"
             >
               <Activity className="w-8 h-8 text-green-400 mx-auto mb-2" />
-              <p className="text-white font-semibold">Health Monitor</p>
-            </button>
+              <p className="text-white font-semibold">Vault Manager</p>
+            </Link>
             
             <button
               onClick={() => router.push('/admin/settings')}

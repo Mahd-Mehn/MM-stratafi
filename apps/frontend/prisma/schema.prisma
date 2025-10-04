@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("NEXT_DATABASE_URL")
+}
+
+model Pool {
+  id                Int      @id @default(autoincrement())
+  vaultId           Int      @unique // On-chain vault ID
+  name              String
+  description       String
+  assetType         String
+  maturity          String
+  status            String   @default("active") // active, closed, pending
+  totalValue        BigInt
+  availableCapital  BigInt
+  healthScore       Int      @default(85)
+  
+  // APY rates for each tranche
+  seniorApy         Float
+  mezzanineApy      Float
+  juniorApy         Float
+  
+  // Current allocations
+  seniorAllocated   BigInt   @default(0)
+  mezzanineAllocated BigInt  @default(0)
+  juniorAllocated   BigInt   @default(0)
+  
+  // Target allocations
+  seniorTarget      BigInt
+  mezzanineTarget   BigInt
+  juniorTarget      BigInt
+  
+  // Metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdBy         String   // Wallet address of creator
+  
+  // Relations
+  assets            PoolAsset[]
+  investments       Investment[]
+  
+  @@map("pools")
+}
+
+model PoolAsset {
+  id       Int    @id @default(autoincrement())
+  poolId   Int
+  type     String
+  value    BigInt
+  rating   String
+  
+  pool     Pool   @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  
+  @@map("pool_assets")
+}
+
+model Investment {
+  id          Int      @id @default(autoincrement())
+  poolId      Int
+  vaultId     Int
+  investorAddress String
+  tranche     String   // Senior, Mezzanine, Junior
+  amount      BigInt
+  txHash      String   @unique
+  confirmed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  pool        Pool     @relation(fields: [poolId], references: [id])
+  
+  @@map("investments")
+}

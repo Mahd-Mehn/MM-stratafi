@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { ArrowLeft, Shield, TrendingUp, AlertTriangle, Clock, DollarSign, Users, FileText, BarChart3, Info } from 'lucide-react'
 import Link from 'next/link'
 import { HealthScoreGauge, WaterfallVisualizer, TrancheSelector } from '../../components/UIComponents'
-import { getPoolById, Pool } from '../../lib/poolsData'
+import { getPoolById, Pool, fetchPoolByIdFromDB } from '../../lib/poolsData'
 import { api } from '../../lib/api'
 import { useAptosTx, isValidTxHash, waitForTransaction } from '../../lib/aptosTx'
 import { useNotifications } from '../../context/NotificationContext'
@@ -31,18 +31,31 @@ export default function PoolDetail() {
 
   const fetchPoolData = async () => {
     setLoading(true)
-    // Get pool data
-    const poolData = getPoolById(Number(id))
-    if (poolData) {
-      setPool(poolData)
+    try {
+      // Get pool data from database first, fallback to static data
+      const poolData = await fetchPoolByIdFromDB(Number(id))
+      if (poolData) {
+        setPool(poolData)
+      }
+    } catch (error) {
+      console.error('Error fetching pool data:', error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const fetchAIHealthScore = async () => {
-    // Fetch real-time health score from Helios AI
-    const healthData = await api.helios.getHealthScore(Number(id))
-    setAiHealthScore(healthData.score)
+    try {
+      // Fetch real-time health score from Helios AI
+      const healthData = await api.helios.getHealthScore(Number(id))
+      if (healthData && typeof healthData.score === 'number') {
+        setAiHealthScore(healthData.score)
+      }
+    } catch (error) {
+      console.error('Error fetching AI health score:', error)
+      // Use default pool health score if AI service fails
+      setAiHealthScore(null)
+    }
   }
 
   const { success, error, loading: notifyLoading, dismiss } = useNotifications()
@@ -53,6 +66,23 @@ export default function PoolDetail() {
       return
     }
 
+    // Check if wallet is connected
+    if (!window.aptos) {
+      error('Wallet Not Found', 'Please install Petra wallet extension')
+      return
+    }
+
+    try {
+      const isConnected = await window.aptos.isConnected()
+      if (!isConnected) {
+        error('Wallet Not Connected', 'Please connect your wallet first')
+        return
+      }
+    } catch (err) {
+      error('Wallet Connection Error', 'Unable to check wallet connection')
+      return
+    }
+
     setInvesting(true)
     const loadingId = notifyLoading(
       'Processing Investment',
@@ -60,14 +90,28 @@ export default function PoolDetail() {
     )
 
     try {
-      const vaultOwner = process.env.NEXT_PUBLIC_MODULE_ADDR as string
+      const vaultOwner = process.env.NEXT_PUBLIC_MODULE_ADDR || process.env.NEXT_PUBLIC_MODULE_ADDRESS || process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as string
       if (!vaultOwner) {
-        throw new Error('Module address not set (NEXT_PUBLIC_MODULE_ADDR)')
+        throw new Error('Module address not set. Please check environment configuration.')
       }
-      const vaultId = Number(id)
+      
+      // TEMPORARY FIX: Use vault #1 for all pools since contract only allows one vault per address
+      const actualVaultId = 1 // All pools use vault #1 until we have multi-vault support
+      
+      console.log('Investment parameters:', {
+        vaultOwner,
+        poolId: Number(id),
+        actualVaultId,
+        tranche: selectedTranche,
+        amount: parseFloat(investAmount)
+      })
+
+      const vaultId = actualVaultId
       const trancheMap: Record<string, number> = { Senior: 0, Mezzanine: 1, Junior: 2 }
       const tranche = trancheMap[selectedTranche] ?? 0
       const amount = Math.floor(parseFloat(investAmount))
+      
+      // This should trigger the Petra wallet popup
       const tx = await callInvest(vaultOwner, vaultId, tranche, amount)
       
       dismiss(loadingId)
@@ -112,15 +156,17 @@ export default function PoolDetail() {
       // Persist to backend after confirmation if possible
       if (isValidTxHash(tx?.hash)) {
         try {
-          await fetch('/api/transactions/log', {
+          const account = await window.aptos.account()
+          await fetch('/api/investments/log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              poolId: Number(id),
-              vaultId,
+              poolId: Number(id), // Keep the actual pool ID for database
+              vaultId: actualVaultId, // Use vault #1 for blockchain
               tranche,
               amount,
               txHash: tx!.hash,
+              investorAddress: account.address,
             }),
           })
         } catch (_) {
@@ -131,8 +177,21 @@ export default function PoolDetail() {
       setInvestAmount('')
     } catch (err) {
       dismiss(loadingId)
-      const message = err instanceof Error ? err.message : 'Could not complete your investment. Please try again.'
-      error('Transaction Failed', message, { duration: 6000 })
+      let message = err instanceof Error ? err.message : 'Could not complete your investment. Please try again.'
+      
+      // Check for specific vault not exists error
+      if (message.includes('E_VAULT_NOT_EXISTS') || message.includes('0xc')) {
+        message = `Vault #${id} doesn't exist on-chain yet. Please create the vault first using the admin interface.`
+        error('Vault Not Found', message, { 
+          duration: 8000,
+          action: {
+            label: 'Create Vault',
+            onClick: () => router.push('/admin/pools/create')
+          }
+        })
+      } else {
+        error('Transaction Failed', message, { duration: 6000 })
+      }
     } finally {
       setInvesting(false)
     }
@@ -168,6 +227,15 @@ export default function PoolDetail() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-400">Pool not found</p>
+      </div>
+    )
+  }
+
+  // Additional safety check for pool data integrity
+  if (!pool.assets || !Array.isArray(pool.assets)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-400">Pool data is incomplete</p>
       </div>
     )
   }
@@ -253,7 +321,7 @@ export default function PoolDetail() {
                 Asset Composition
               </h2>
               <div className="space-y-3">
-                {pool.assets.map((asset, index) => (
+                {pool.assets?.map((asset, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
                     <div>
                       <p className="text-white font-medium">{asset.type}</p>
@@ -267,7 +335,7 @@ export default function PoolDetail() {
                       {asset.rating}
                     </span>
                   </div>
-                ))}
+                )) || <p className="text-gray-400">No assets available</p>}
               </div>
             </motion.div>
 
@@ -407,13 +475,25 @@ export default function PoolDetail() {
                   </a>
                 )}
 
-                <div className="flex items-start gap-2 p-3 bg-blue-500/10 rounded-lg">
-                  <Info className="w-4 h-4 text-blue-400 mt-0.5" />
-                  <p className="text-xs text-gray-300">
-                    By investing, you agree to lock your funds for the {pool.maturity} maturity period. 
-                    Returns are paid according to the waterfall distribution model.
-                  </p>
-                </div>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <h3 className="text-blue-400 font-medium mb-1">Investment Information</h3>
+                        <p className="text-blue-300 text-sm">
+                          Your investment will be processed through Aptos smart contracts. 
+                          All pools currently use the same underlying vault for blockchain transactions.
+                          Ensure you have sufficient APT for gas fees.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
               </div>
             </motion.div>
           </div>

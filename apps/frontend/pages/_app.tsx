@@ -13,9 +13,9 @@ function AppContent({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
       </Layout>
       <NotificationContainer>
-        {notifications.map((notification) => (
+        {notifications?.map((notification) => (
           <Notification key={notification.id} {...notification} />
-        ))}
+        )) || null}
       </NotificationContainer>
     </>
   )

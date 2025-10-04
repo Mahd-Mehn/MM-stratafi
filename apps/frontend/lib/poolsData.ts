@@ -128,3 +128,101 @@ export const poolsData: Pool[] = [
 export function getPoolById(id: number): Pool | undefined {
   return poolsData.find(pool => pool.id === id)
 }
+
+// New function to fetch pools from database
+export async function fetchPoolsFromDB(): Promise<Pool[]> {
+  try {
+    const response = await fetch('/api/pools')
+    if (!response.ok) {
+      throw new Error('Failed to fetch pools')
+    }
+    const dbPools = await response.json()
+    
+    // Transform database pools to match the Pool interface
+    return dbPools.map((dbPool: any) => ({
+      id: dbPool.vaultId, // Use vaultId as the pool ID for frontend
+      name: dbPool.name,
+      totalValue: parseInt(dbPool.totalValue),
+      availableCapital: parseInt(dbPool.availableCapital),
+      apy: {
+        senior: dbPool.seniorApy,
+        mezzanine: dbPool.mezzanineApy,
+        junior: dbPool.juniorApy
+      },
+      healthScore: dbPool.healthScore,
+      assetType: dbPool.assetType,
+      maturity: dbPool.maturity,
+      status: dbPool.status as 'active' | 'closed' | 'pending',
+      description: dbPool.description,
+      assets: dbPool.assets.map((asset: any) => ({
+        type: asset.type,
+        value: parseInt(asset.value),
+        rating: asset.rating
+      })),
+      currentAllocations: {
+        senior: parseInt(dbPool.seniorAllocated),
+        mezzanine: parseInt(dbPool.mezzanineAllocated),
+        junior: parseInt(dbPool.juniorAllocated)
+      },
+      targetAllocations: {
+        senior: parseInt(dbPool.seniorTarget),
+        mezzanine: parseInt(dbPool.mezzanineTarget),
+        junior: parseInt(dbPool.juniorTarget)
+      }
+    }))
+  } catch (error) {
+    console.error('Error fetching pools from database:', error)
+    // Fallback to static data
+    return poolsData
+  }
+}
+
+export async function fetchPoolByIdFromDB(id: number): Promise<Pool | null> {
+  try {
+    const response = await fetch(`/api/pools/${id}`)
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null
+      }
+      throw new Error('Failed to fetch pool')
+    }
+    const dbPool = await response.json()
+    
+    // Transform database pool to match the Pool interface
+    return {
+      id: dbPool.vaultId,
+      name: dbPool.name,
+      totalValue: parseInt(dbPool.totalValue),
+      availableCapital: parseInt(dbPool.availableCapital),
+      apy: {
+        senior: dbPool.seniorApy,
+        mezzanine: dbPool.mezzanineApy,
+        junior: dbPool.juniorApy
+      },
+      healthScore: dbPool.healthScore,
+      assetType: dbPool.assetType,
+      maturity: dbPool.maturity,
+      status: dbPool.status as 'active' | 'closed' | 'pending',
+      description: dbPool.description,
+      assets: dbPool.assets.map((asset: any) => ({
+        type: asset.type,
+        value: parseInt(asset.value),
+        rating: asset.rating
+      })),
+      currentAllocations: {
+        senior: parseInt(dbPool.seniorAllocated),
+        mezzanine: parseInt(dbPool.mezzanineAllocated),
+        junior: parseInt(dbPool.juniorAllocated)
+      },
+      targetAllocations: {
+        senior: parseInt(dbPool.seniorTarget),
+        mezzanine: parseInt(dbPool.mezzanineTarget),
+        junior: parseInt(dbPool.juniorTarget)
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching pool from database:', error)
+    // Fallback to static data
+    return getPoolById(id) || null
+  }
+}
