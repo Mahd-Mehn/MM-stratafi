@@ -36,6 +36,8 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
     "autoprefixer": "^10.4.17",
     "eslint": "^8.57.0",
     "postcss": "^8.4.33",
