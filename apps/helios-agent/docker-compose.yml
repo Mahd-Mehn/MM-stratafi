@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  helios-agent:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - APTOS_NODE_URL=${APTOS_NODE_URL:-https://fullnode.testnet.aptoslabs.com/v1}
+      - HELIOS_AGENT_PRIVATE_KEY=${HELIOS_AGENT_PRIVATE_KEY}
+      - NODIT_API_KEY=${NODIT_API_KEY:-}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./helios.db}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: PostgreSQL database for production
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=helios
+      - POSTGRES_USER=helios
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-helios123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
