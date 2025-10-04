@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, TrendingUp, TrendingDown, BarChart3, PieChart, Activity, Users, DollarSign, Calendar } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Users, DollarSign, Activity, ArrowUpRight, ArrowDownRight, BarChart3, PieChart } from 'lucide-react'
 import Link from 'next/link'
 import { poolsData } from '../../lib/poolsData'
 
